@@ -1,0 +1,13 @@
+{% extends 'stock/base.html' %}
+
+{% block content %}
+    {% if latest_users %}
+    <ul>
+    {% for user in latest_users %}
+        <li><a href="/stock/user/{{ user.id }}/">{{ user.name }}</a></li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p>No Users are available.</p>
+    {% endif %}
+{% endblock %}
