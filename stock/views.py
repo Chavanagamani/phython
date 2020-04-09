@@ -59,7 +59,7 @@ def root_mean_squared_error(y_true, y_pred):
 
 
 # used to create model
-def dump_model(request):
+def create_model(request):
     data_set = pd.read_csv(r'D:\testProjectDjango\products\formatted_128714.csv')
     copy = pd.read_csv(r'D:\testProjectDjango\products\formatted_128714.csv')
     dataset = data_set[['DATE', 'OP', 'CLS']]
