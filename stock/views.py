@@ -18,6 +18,7 @@ from keras.layers import Dropout
 from keras.regularizers import L1L2
 from keras import backend as K
 from sklearn.externals import joblib  # save the model
+import keras.losses
 
 
 # Using HttpResponse function
@@ -60,41 +61,44 @@ def root_mean_squared_error(y_true, y_pred):
 
 # used to create model
 def create_model(request):
-    data_set = pd.read_csv(r'D:\testProjectDjango\products\formatted_128714.csv')
-    copy = pd.read_csv(r'D:\testProjectDjango\products\formatted_128714.csv')
-    dataset = data_set[['DATE', 'OP', 'CLS']]
+    data_set = pd.read_csv(r'C:\Users\shanaka\Desktop\final semester\projects V2\stockserver\formatted_all.csv')
+    copy = pd.read_csv('formatted_all.csv')
+    data_set = data_set[['DATE', 'OP', 'CLS']]
     days = []
 
-    for i in range(1773):
-        s = str(dataset.loc[i, 'DATE'])
+    for i in range(1549):
+        s = str(data_set.loc[i, 'DATE'])
         # you could also import date instead of datetime and use that.
         date = datetime(year=int(s[0:4]), month=int(s[4:6]), day=int(s[6:8]))
         days.append(date.weekday())
-        dataset.loc[i, 'DATE'] = date.date()
+        data_set.loc[i, 'DATE'] = date.date()
 
-    dataset['DAY'] = days
-    dataset = dataset[['DATE', 'DAY', 'CLS']]
+    data_set['DAY'] = days
+    data_set = data_set[['DATE', 'DAY', 'CLS']]
 
-    values = dataset.iloc[:, 1:4].values;
+    values = data_set.iloc[:, 1:4].values;
     values = values.astype('float32')
 
     # normalize features
     scaler = MinMaxScaler(feature_range=(0, 1))
-    fit_transform_values = scaler.fit_transform(values)
-    reframed = series_to_supervised(values, 4, 1)
-    values = reframed.values
-    train = values[:1400, :]
-    val = values[1400:1525, :]
-    test = values[1525:, :]
+    values = scaler.fit_transform(values)
 
-    # split into input and outputs
+    reframed = series_to_supervised(values, 4, 1)
+
+    # corr = reframed.corrwith(reframed['var1(t)'])
+    # corr.sort_values().plot.barh(color = 'blue',title = 'Strength of Correlation')
+
+    # split into train and test sets
+    values = reframed.values
+    train = values[:1000, :]
+    val = values[1000:1349, :]
+
     train_X, train_y = train[:, :-1], train[:, -1]
     val_X, val_y = val[:, :-1], val[:, -1]
-    test_X, test_y = test[:, :-1], test[:, -1]
-    # reshape input to be 3D [samples, timesteps, features]
+
     train_X = train_X.reshape((train_X.shape[0], 1, train_X.shape[1]))
     val_X = val_X.reshape((val_X.shape[0], 1, val_X.shape[1]))
-    test_X = test_X.reshape((test_X.shape[0], 1, test_X.shape[1]))
+
     model = Sequential()
     model.add(LSTM(units=128, return_sequences=True, input_shape=(train_X.shape[1], train_X.shape[2]),
                    bias_regularizer=L1L2(l1=0.001, l2=0.001)))
@@ -106,20 +110,48 @@ def create_model(request):
     model.add(Dense(units=16, init='uniform', activation='relu'))
 
     model.add(Dense(units=1))
-    model.compile(optimizer='adam', loss=root_mean_squared_error)
+    model.compile(optimizer='adam', loss=keras.losses.mean_squared_error)
     history = model.fit(train_X, train_y, epochs=100, batch_size=50, validation_data=(val_X, val_y), verbose=2,
                         shuffle=False)
+
     joblib.dump(model, 'stock-pre.joblib')
     return HttpResponse('model creation completed')
 
 
 # used to get model predictions
-def run_model(request):
-    model = joblib.load('stock-pre.joblib')
+def run_model(request, data):
+    data_set = pd.read_csv(r'C:\Users\shanaka\Desktop\final semester\projects V2\stockserver\formatted_all.csv')
+    data_set = data_set[['DATE', 'OP', 'CLS']]
+    days = []
 
-    ### has to check
-    predictions = model.predict([[21, 1]])
-    return HttpResponse('model value created')
+    for i in range(1549):
+        s = str(data_set.loc[i, 'DATE'])
+        # you could also import date instead of datetime and use that.
+        date = datetime(year=int(s[0:4]), month=int(s[4:6]), day=int(s[6:8]))
+        days.append(date.weekday())
+        data_set.loc[i, 'DATE'] = date.date()
+
+    data_set['DAY'] = days
+    data_set = data_set[['DATE', 'DAY', 'CLS']]
+
+    values = data_set.iloc[:, 1:4].values;
+    values = values.astype('float32')
+
+    # normalize features
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    values = scaler.fit_transform(values)
+
+    model = joblib.load('stock-pre.joblib')
+    input_values = values[1349 + data: 1349 + data + 1, :]
+    input_values_X, input_values_y = input_values[:, :-1], input_values[:, -1]
+    input_values_X = input_values_X.reshape((input_values_X.shape[0], 1, input_values_X.shape[1]))
+    predictions = model.predict(input_values_X, batch_size=1)
+    Send_value = "sell"
+
+    if(predictions > values[1349 + data][3]):
+        Send_value = "not sell"
+
+    return HttpResponse(Send_value)
 
 
 def get_pre_model():
