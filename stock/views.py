@@ -3,6 +3,8 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
 
 from .models import User, Stock
+from tensorflow.python.keras.layers import Dense
+from tensorflow.python.keras import Sequential
 
 import sys
 import numpy as np
@@ -20,6 +22,8 @@ from keras import backend as K
 from sklearn.externals import joblib  # save the model
 import keras.losses
 
+classifier = Sequential()
+classifier.add(Dense(6, init = 'uniform', activation = 'relu', input_dim = 11))
 
 # Using HttpResponse function
 def user_details(request):
@@ -61,22 +65,21 @@ def root_mean_squared_error(y_true, y_pred):
 
 # used to create model
 def create_model(request):
-    data_set = pd.read_csv(r'C:\Users\shanaka\Desktop\final semester\projects V2\stockserver\formatted_all.csv')
-    copy = pd.read_csv('formatted_all.csv')
-    data_set = data_set[['DATE', 'OP', 'CLS']]
+    dataset = pd.read_csv(r'C:\Users\shanaka\Desktop\final semester\projects V2\stockserver\formatted_all.csv')
+    dataset = dataset[['DATE', 'OP', 'CLS']]
     days = []
 
     for i in range(1549):
-        s = str(data_set.loc[i, 'DATE'])
+        s = str(dataset.loc[i, 'DATE'])
         # you could also import date instead of datetime and use that.
         date = datetime(year=int(s[0:4]), month=int(s[4:6]), day=int(s[6:8]))
         days.append(date.weekday())
-        data_set.loc[i, 'DATE'] = date.date()
+        dataset.loc[i, 'DATE'] = date.date()
 
-    data_set['DAY'] = days
-    data_set = data_set[['DATE', 'DAY', 'CLS']]
+    dataset['DAY'] = days
+    dataset = dataset[['DATE', 'DAY', 'CLS']]
 
-    values = data_set.iloc[:, 1:4].values;
+    values = dataset.iloc[:, 1:3].values;
     values = values.astype('float32')
 
     # normalize features
@@ -84,9 +87,6 @@ def create_model(request):
     values = scaler.fit_transform(values)
 
     reframed = series_to_supervised(values, 4, 1)
-
-    # corr = reframed.corrwith(reframed['var1(t)'])
-    # corr.sort_values().plot.barh(color = 'blue',title = 'Strength of Correlation')
 
     # split into train and test sets
     values = reframed.values
@@ -114,8 +114,9 @@ def create_model(request):
     history = model.fit(train_X, train_y, epochs=100, batch_size=50, validation_data=(val_X, val_y), verbose=2,
                         shuffle=False)
 
+
     joblib.dump(model, 'stock-pre.joblib')
-    return HttpResponse('model creation completed')
+    return HttpResponse('done')
 
 
 # used to get model predictions
@@ -134,12 +135,12 @@ def run_model(request, data):
     data_set['DAY'] = days
     data_set = data_set[['DATE', 'DAY', 'CLS']]
 
-    values = data_set.iloc[:, 1:4].values;
-    values = values.astype('float32')
+    stock_values = data_set.iloc[:, 1:4].values;
+    stock_values = stock_values.astype('float32')
 
     # normalize features
     scaler = MinMaxScaler(feature_range=(0, 1))
-    values = scaler.fit_transform(values)
+    values = scaler.fit_transform(stock_values)
 
     model = joblib.load('stock-pre.joblib')
     input_values = values[1349 + data: 1349 + data + 1, :]
@@ -166,6 +167,7 @@ def send_stock(request, value):
         return HttpResponse('sell')
 
 
+# convert series to supervised learning
 def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
     n_vars = 1 if type(data) is list else data.shape[1]
     df = pd.DataFrame(data)
@@ -173,14 +175,14 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
     # input sequence (t-n, ... t-1)
     for i in range(n_in, 0, -1):
         cols.append(df.shift(i))
-        names += [('var%d(t-%d)' % (j + 1, i)) for j in range(n_vars)]
+        names += [('var%d(t-%d)' % (j+1, i)) for j in range(n_vars)]
     # forecast sequence (t, t+1, ... t+n)
     for i in range(0, n_out):
         cols.append(df.shift(-i))
         if i == 0:
-            names += [('var%d(t)' % (j + 1)) for j in range(n_vars)]
+            names += [('var%d(t)' % (j+1)) for j in range(n_vars)]
         else:
-            names += [('var%d(t+%d)' % (j + 1, i)) for j in range(n_vars)]
+            names += [('var%d(t+%d)' % (j+1, i)) for j in range(n_vars)]
     # put it all together
     agg = pd.concat(cols, axis=1)
     agg.columns = names
