@@ -3,8 +3,8 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
 
 from .models import User, Stock
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras import Sequential
+
+
 
 import sys
 import numpy as np
@@ -22,8 +22,6 @@ from keras import backend as K
 from sklearn.externals import joblib  # save the model
 import keras.losses
 
-classifier = Sequential()
-classifier.add(Dense(6, init = 'uniform', activation = 'relu', input_dim = 11))
 
 # Using HttpResponse function
 def user_details(request):
@@ -135,12 +133,15 @@ def run_model(request, data):
     data_set['DAY'] = days
     data_set = data_set[['DATE', 'DAY', 'CLS']]
 
-    stock_values = data_set.iloc[:, 1:4].values;
+    stock_values = data_set.iloc[:, 1:3].values;
     stock_values = stock_values.astype('float32')
 
     # normalize features
     scaler = MinMaxScaler(feature_range=(0, 1))
     values = scaler.fit_transform(stock_values)
+
+    reframed = series_to_supervised(values, 4, 1)
+    values = reframed.values
 
     model = joblib.load('stock-pre.joblib')
     input_values = values[1349 + data: 1349 + data + 1, :]
