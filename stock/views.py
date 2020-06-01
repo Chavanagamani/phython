@@ -135,7 +135,7 @@ def run_model(request, data):
 
     stock_values = data_set.iloc[:, 1:3].values;
     stock_values = stock_values.astype('float32')
-
+    data_set.iloc[1349 + data: 1349 + data + 1, :].values;
     # normalize features
     scaler = MinMaxScaler(feature_range=(0, 1))
     values = scaler.fit_transform(stock_values)
@@ -148,12 +148,12 @@ def run_model(request, data):
     input_values_X, input_values_y = input_values[:, :-1], input_values[:, -1]
     input_values_X = input_values_X.reshape((input_values_X.shape[0], 1, input_values_X.shape[1]))
     predictions = model.predict(input_values_X, batch_size=1)
-    Send_value = "sell"
+    Send_value = "low"
 
     if(predictions > values[1349 + data][3]):
-        Send_value = "not sell"
+        Send_value = "high"
 
-    return HttpResponse(Send_value)
+    return HttpResponse(Send_value);
 
 
 def get_pre_model():
@@ -191,3 +191,5 @@ def series_to_supervised(data, n_in=1, n_out=1, dropnan=True):
     if dropnan:
         agg.dropna(inplace=True)
     return agg
+
+
